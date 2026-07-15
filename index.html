@@ -1406,9 +1406,11 @@ function taskForm(cid,tid){
 function esCard(e,cid,withCompany){
   const n = zenkakuLen(e.body||'');
   const over = e.limit && n>e.limit;
+  const st=esStatus(e);
+  const stStyle={pass:'background:var(--green-bg);color:var(--green);border-color:var(--green)',wait:'background:var(--yellow-bg);color:var(--yellow);border-color:var(--yellow-bd)',fail:'background:var(--red-bg);color:var(--red);border-color:var(--red)'}[st];
   return `<div class="rec es-card" data-id="${e.id}" data-co="${cid}">
     <div class="rec-top">
-      <div class="star ${e.passed?'on':''}"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>
+      <div class="star ${st==='pass'?'on':''}"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>
       <div class="rtitle">${esc(e.title||'無題')}</div>
     </div>
     ${withCompany?`<div class="rco">${esc(findCompany(cid)?.name||'')}</div>`:''}
@@ -1416,13 +1418,16 @@ function esCard(e,cid,withCompany){
       ${(e.genres||[]).map(g=>{ const cc=customColor('genres',g); return cc?`<span class="badge ${cc}">${esc(g)}</span>`:`<span class="tag genre">${esc(g)}</span>`; }).join('')}
       <span class="tag cnt" style="${over?'background:var(--red);border-color:var(--red)':''}">${fmtLen(n)}字${e.limit?` / ${e.limit}`:''}</span>
       ${e.submitDate?`<span class="tag date">提出 ${fmtDateOnly(e.submitDate)}</span>`:''}
-      <span class="tag" style="${e.passed?'background:var(--green-bg);color:var(--green);border-color:var(--green-bg)':''}">${e.passed?'通過':'—'}</span>
+      <span class="tag" style="${stStyle}">${PASS_LABEL[st]}</span>
     </div>
     ${e.body?`<div class="rbody clamp">${esc(e.body)}</div><div class="rbody-actions"><button class="expand">全文を表示</button><button class="copybody"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>本文をコピー</button></div>`:''}
   </div>`;
 }
 /* 面接の通過可否：新形式 passStatus('pass'/'wait'/'fail') と旧形式 passed(真偽) の両対応 */
 function ivStatus(v){ if(v && v.passStatus) return v.passStatus; return (v && v.passed)?'pass':'wait'; }
+/* ESの通過可否も面接と同様に3状態。初期設定は「通過待ち」(wait) */
+function esStatus(e){ if(e && e.passStatus) return e.passStatus; return (e && e.passed)?'pass':'wait'; }
+const PASS_LABEL={pass:'通過',wait:'通過待ち',fail:'未通過'};
 const IV_PASS_LABEL={pass:'✓ 通過',wait:'通過待ち',fail:'✕ 未通過'};
 const IV_PASS_CLASS={pass:'pass-y',wait:'pass-w',fail:'pass-n'};
 function ivCard(v,cid,withCompany){
@@ -1456,6 +1461,7 @@ function toggleClamp(node,e){ e.stopPropagation(); const b=$('.rbody',node); con
 function esForm(cid,id){
   const c=findCompany(cid); const e = id? (c.es||[]).find(x=>x.id===id):null; const isEdit=!!e;
   let selGenres = e&&Array.isArray(e.genres)? [...e.genres] : (e&&e.genre?[e.genre]:[]);
+  const efPass = esStatus(e||{}); // 新規は「通過待ち」(wait) が初期値
   const genreChips=()=> state.settings.genres.map(g=>`<button type="button" class="chip ${selGenres.includes(g)?'on':''}" data-g="${esc(g)}">${esc(g)}</button>`).join('')+`<button type="button" class="chip chip-add" id="ef-genre-add">＋ 追加</button>`;
   openModal(`
     <div class="modal-h modal-h-3">
@@ -1464,7 +1470,13 @@ function esForm(cid,id){
       <button class="hdr-save" id="ef-save">${isEdit?'保存':'追加'}</button>
     </div>
     <div class="modal-body">
-      <div class="fld"><label>通過可否</label><div class="starpick" id="ef-star"><button class="${e&&e.passed?'on':''}"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></button><span style="font-size:13px;color:var(--ink-soft);font-weight:700" id="ef-star-lbl">${e&&e.passed?'通過':'未通過 / 未定'}</span></div></div>
+      <div class="fld"><label>通過可否</label>
+        <div class="passseg" id="ef-pass">
+          <button type="button" data-v="pass" class="${efPass==='pass'?'on p-pass':''}">✓ 通過</button>
+          <button type="button" data-v="wait" class="${efPass==='wait'?'on p-wait':''}">通過待ち</button>
+          <button type="button" data-v="fail" class="${efPass==='fail'?'on p-fail':''}">✕ 未通過</button>
+        </div>
+      </div>
       <div class="fld"><label>タイトル</label><input type="text" id="ef-title" value="${esc(e?e.title:'')}" placeholder="例）2025卒 本選考ES"></div>
       <div class="row" style="gap:10px">
         <div class="fld" style="flex:1"><label>提出日</label><input type="date" id="ef-date" value="${e&&e.submitDate?e.submitDate:''}"></div>
@@ -1475,9 +1487,11 @@ function esForm(cid,id){
       ${isEdit?`<button class="delbtn" id="ef-del">削除</button>`:''}
     </div>`);
   $('#modal-bg .modal').classList.add('has-hdr-actions');
-  let passed = e? !!e.passed : false;
-  const starBtn=$('#ef-star button'), starLbl=$('#ef-star-lbl');
-  starBtn.onclick=()=>{ passed=!passed; starBtn.classList.toggle('on',passed); starLbl.textContent=passed?'通過':'未通過 / 未定'; };
+  let passStatus = efPass;
+  $$('#ef-pass button').forEach(b=>{ b.onclick=()=>{
+    passStatus=b.dataset.v;
+    $$('#ef-pass button').forEach(x=>{ x.className=(x.dataset.v===passStatus)?('on p-'+passStatus):''; });
+  }; });
   const body=$('#ef-body'), cnt=$('#ef-cnt'), limitInput=$('#ef-limit');
   const upd=()=>{ const n=zenkakuLen(body.value); const lim=parseInt(limitInput.value,10); const over=lim&&n>lim; cnt.textContent=fmtLen(n)+'字'+(lim?` / ${lim}`:''); cnt.style.color=over?'var(--red)':''; };
   body.oninput=upd; limitInput.oninput=upd; upd();
@@ -1493,7 +1507,7 @@ function esForm(cid,id){
   const doSave=()=>{
     const title=$('#ef-title').value.trim(); if(!title){ toast('タイトルを入力してください'); return; }
     const lim=parseInt(limitInput.value,10);
-    const data={ passed, title, submitDate:$('#ef-date').value, genres:[...selGenres], genre:selGenres[0]||'', limit: isNaN(lim)?'':lim, body:body.value };
+    const data={ passStatus, passed:passStatus==='pass', title, submitDate:$('#ef-date').value, genres:[...selGenres], genre:selGenres[0]||'', limit: isNaN(lim)?'':lim, body:body.value };
     if(isEdit) Object.assign(e,data);
     else { c.es=c.es||[]; c.es.push({id:uid(),...data}); }
     persist(); closeModal(); toast(isEdit?'保存しました':'ESを追加しました'); refreshAfterChange();
@@ -1576,8 +1590,7 @@ function renderCes(){
   let items=[];
   state.companies.forEach(c=> (c.es||[]).forEach(e=> items.push({...e,companyId:c.id,companyName:c.name})));
   // filters
-  if(ui.esPass==='pass') items=items.filter(i=>i.passed);
-  else if(ui.esPass==='fail') items=items.filter(i=>!i.passed);
+  if(ui.esPass==='pass'||ui.esPass==='wait'||ui.esPass==='fail') items=items.filter(i=>esStatus(i)===ui.esPass);
   // ESが無くなった企業は選択から除外
   ui.esCompanies=ui.esCompanies.filter(id=>coWithEs.some(c=>c.id===id));
   if(ui.esCompanies.length) items=items.filter(i=>ui.esCompanies.includes(i.companyId));
@@ -1592,7 +1605,8 @@ function renderCes(){
     <div class="row" style="margin-bottom:8px;align-items:center;gap:8px">
       <div class="seg" id="ces-pass">
         <button data-p="all" class="${ui.esPass==='all'?'on':''}">すべて</button>
-        <button data-p="pass" class="${ui.esPass==='pass'?'on':''}">★ 通過</button>
+        <button data-p="pass" class="${ui.esPass==='pass'?'on':''}">通過</button>
+        <button data-p="wait" class="${ui.esPass==='wait'?'on':''}">通過待ち</button>
         <button data-p="fail" class="${ui.esPass==='fail'?'on':''}">未通過</button>
       </div>
       <div style="flex:1"></div>
