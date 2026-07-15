@@ -318,6 +318,15 @@ h1,h2,h3,h4{font-family:"Zen Maru Gothic",sans-serif;margin:0;font-weight:700}
 .optlist .o .mv:disabled{opacity:.28}
 .optlist .o .mv:not(:disabled):active{background:var(--line)}
 .optlist .o .del{width:30px;height:30px;border-radius:8px;color:var(--red);background:var(--red-bg);font-size:16px;line-height:1;display:grid;place-items:center}
+.optlist .o .clr{width:30px;height:30px;border-radius:8px;background:var(--surface-2);display:grid;place-items:center;flex:none;border:1px solid var(--line)}
+.optlist .o .clr .sw{width:16px;height:16px;border-radius:50%;border:1.5px solid rgba(0,0,0,.12)}
+.optlist .o .clr .sw.auto{background:conic-gradient(var(--green),var(--yellow),var(--red),var(--blue),var(--green));position:relative}
+.clr-picker{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+.clr-picker .co{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--ink-soft);width:58px}
+.clr-picker .co .sw{width:34px;height:34px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center}
+.clr-picker .co.on .sw{border-color:var(--navy);box-shadow:0 0 0 2px var(--navy)}
+.clr-picker .co .sw.auto{background:conic-gradient(var(--green),var(--yellow),var(--red),var(--blue),var(--green))}
+.clr-picker .co .sw.chk{color:var(--navy);font-weight:900;font-size:16px}
 .toast{position:fixed;bottom:calc(var(--tabbar-h) + 18px);left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 18px;border-radius:22px;font-size:13px;font-weight:700;z-index:80;opacity:0;transition:.25s;pointer-events:none;box-shadow:var(--shadow-lg)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .filewrap{border:1.5px dashed var(--line);border-radius:11px;padding:13px;text-align:center;background:var(--surface-2);font-size:13px;font-weight:700;color:var(--navy)}
@@ -580,6 +589,8 @@ function migrate(s){
   if(s.settings.resultOptions.indexOf('結果待ち')<0) s.settings.resultOptions.unshift('結果待ち');
   s.settings.industries=s.settings.industries||[...DEFAULT_IND];
   s.settings.genres=s.settings.genres||[...DEFAULT_GENRE];
+  s.settings.optionColors=s.settings.optionColors||{};
+  ['statusOptions','resultOptions','industries','genres'].forEach(k=>{ s.settings.optionColors[k]=s.settings.optionColors[k]||{}; });
   s.companies=(s.companies||[]).map(c=>{
     const co={tracks:{main:{status:'未着手',result:''},intern:{status:'未着手',result:''}},tasks:[],es:[],interviews:[],...c};
     ['main','intern'].forEach(k=>{ co.tracks[k]=co.tracks[k]||{status:'未着手',result:''}; if(typeof co.tracks[k].memo!=='string') co.tracks[k].memo=''; });
@@ -686,7 +697,7 @@ const DEFAULT_GENRE=['企業志望理由','業種志望理由','ガクチカ','�
 
 let state={
   companies:[],
-  settings:{ weekStart:'sun', layoutMode:'auto', statusOptions:[...DEFAULT_STATUS], resultOptions:[...DEFAULT_RESULT], industries:[...DEFAULT_IND], genres:[...DEFAULT_GENRE] },
+  settings:{ weekStart:'sun', layoutMode:'auto', statusOptions:[...DEFAULT_STATUS], resultOptions:[...DEFAULT_RESULT], industries:[...DEFAULT_IND], genres:[...DEFAULT_GENRE], optionColors:{statusOptions:{},resultOptions:{},industries:{},genres:{}} },
   ui:{}
 };
 const ui={ // transient, not persisted
@@ -697,13 +708,31 @@ const ui={ // transient, not persisted
 };
 
 /* ---------- status color ---------- */
+// 選べる色（既存の6色）。初期設定=null は自動ルールに従う
+const COLOR_CHOICES=[
+  {k:'green', label:'緑'},
+  {k:'pink',  label:'ピンク'},
+  {k:'red',   label:'赤'},
+  {k:'yellow',label:'黄'},
+  {k:'blue',  label:'青'},
+  {k:'muted', label:'グレー'},
+];
+// ユーザーが指定したカスタム色を返す（未指定なら null）
+function customColor(key,val){
+  const m=state.settings.optionColors&&state.settings.optionColors[key];
+  return (m&&val&&m[val])||null;
+}
 function statusClass(s){
+  const cc=customColor('statusOptions',s); if(cc) return cc;
   if(!s||s==='未着手') return 'muted';
   if(s==='インターン確定'||s==='内定') return 'pink';
   return 'green';
 }
 function isResult(r){ return r&&r!=='' ; }
-function resultClass(r){ if(!r) return 'muted'; if(r==='結果待ち') return 'yellow'; if(r==='準備中') return 'blue'; return 'red'; }
+function resultClass(r){
+  const cc=customColor('resultOptions',r); if(cc) return cc;
+  if(!r) return 'muted'; if(r==='結果待ち') return 'yellow'; if(r==='準備中') return 'blue'; return 'red';
+}
 function zenkakuLen(s){ let n=0; for(const ch of (s||'')){ n += /[\x00-\xFF\uFF61-\uFF9F]/.test(ch)?0.5:1; } return n; }
 function fmtLen(n){ return (n%1===0)? String(n) : String(n.toFixed(1)); }
 function aspStars(n){ n=n||0; return '★'.repeat(n)+'<span style="color:var(--line)">'+'★'.repeat(5-n)+'</span>'; }
@@ -1091,7 +1120,7 @@ function renderCompanyList(){
         <div class="co-asp">${aspStars(c.aspiration)}</div>
       </div>
       <div class="co-meta">
-        ${c.industry?`<span class="badge ind">${esc(c.industry)}</span>`:''}
+        ${c.industry?`<span class="badge ${customColor('industries',c.industry)||'ind'}">${esc(c.industry)}</span>`:''}
         <span class="badge ${stCls}">${esc(tr.status||'未着手')}</span>
         ${resultBadge}
       </div>
@@ -1317,7 +1346,11 @@ function taskForm(cid,tid){
   const remindOpts=REMIND_OPTS.map(o=>`<option value="${o[0]}" ${((t&&t.reminder===o[0])||(!(t&&t.reminder)&&o[0]==='none'))?'selected':''}>${o[1]}</option>`).join('');
   const type0=(t&&t.type)||'task';
   openModal(`
-    <div class="modal-h"><div class="mt">${isEdit?'編集':'追加'}</div><button class="modal-x" data-close>閉じる</button></div>
+    <div class="modal-h modal-h-3">
+      <button class="hdr-close" data-close>閉じる</button>
+      <div class="mt">${isEdit?'編集':'追加'}</div>
+      <button class="hdr-save" id="tf-save">${isEdit?'保存':'追加'}</button>
+    </div>
     <div class="modal-body">
       <div class="fld"><label>種類</label>
         <div class="seg" id="tf-type" style="width:100%">
@@ -1331,10 +1364,10 @@ function taskForm(cid,tid){
       <div class="fld"><label id="tf-end-label">達成期限（終了日時）</label><input type="datetime-local" id="tf-end" value="${t&&t.end?t.end:''}"><div class="hint" id="tf-end-hint"></div></div>
       <div class="fld"><label>メモ <span class="opt">（任意）</span></label><textarea id="tf-memo" class="task-memo" placeholder="補足メモ（持ち物、場所、URLなど）">${esc(t&&t.memo?t.memo:'')}</textarea></div>
       <div class="fld"><label>リマインド（通知）</label><div class="selwrap"><select id="tf-remind">${remindOpts}</select></div><div class="hint">「カレンダーに追加」で書き出した予定に通知が設定されます。終了日時が基準です。</div></div>
-      <button class="savebtn" id="tf-save">${isEdit?'保存する':'追加する'}</button>
       <button class="add-sm" id="tf-ics" style="margin-top:9px">📅 標準カレンダーに追加</button>
       ${isEdit?`<button class="delbtn" id="tf-del">削除</button>`:''}
     </div>`);
+  $('#modal-bg .modal').classList.add('has-hdr-actions');
   let curType=type0;
   const applyType=()=>{
     $('#tf-name-label').textContent = curType==='event'?'予定名':'タスク名';
@@ -1380,7 +1413,7 @@ function esCard(e,cid,withCompany){
     </div>
     ${withCompany?`<div class="rco">${esc(findCompany(cid)?.name||'')}</div>`:''}
     <div class="rmeta">
-      ${(e.genres||[]).map(g=>`<span class="tag genre">${esc(g)}</span>`).join('')}
+      ${(e.genres||[]).map(g=>{ const cc=customColor('genres',g); return cc?`<span class="badge ${cc}">${esc(g)}</span>`:`<span class="tag genre">${esc(g)}</span>`; }).join('')}
       <span class="tag cnt" style="${over?'background:var(--red);border-color:var(--red)':''}">${fmtLen(n)}字${e.limit?` / ${e.limit}`:''}</span>
       ${e.submitDate?`<span class="tag date">提出 ${fmtDateOnly(e.submitDate)}</span>`:''}
       <span class="tag" style="${e.passed?'background:var(--green-bg);color:var(--green);border-color:var(--green-bg)':''}">${e.passed?'通過':'—'}</span>
@@ -1677,7 +1710,10 @@ function addOptionModal(title,settingsKey,onAdd){
   const m=$('.modal',bg);
   const ARU='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>';
   const ARD='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+  const hasColor=['statusOptions','resultOptions','industries','genres'].includes(settingsKey);
+  const swHTML=(o)=>{ const cc=customColor(settingsKey,o); return cc? `<span class="sw" style="background:var(--${cc}-bg);border-color:var(--${cc})"></span>` : `<span class="sw auto"></span>`; };
   const rowsHTML=()=> cur.map((o,i)=>`<div class="o">
+      ${hasColor?`<button class="clr" data-act="clr" data-i="${i}" aria-label="色を選ぶ">${swHTML(o)}</button>`:''}
       <span class="nm">${esc(o)}</span>
       <button class="mv" data-act="up" data-i="${i}" ${i===0?'disabled':''} aria-label="上へ">${ARU}</button>
       <button class="mv" data-act="dn" data-i="${i}" ${i===cur.length-1?'disabled':''} aria-label="下へ">${ARD}</button>
@@ -1703,6 +1739,7 @@ function addOptionModal(title,settingsKey,onAdd){
   function bindRows(){
     $$('#ao-list .o button',m).forEach(b=> b.onclick=()=>{
       const i=+b.dataset.i, act=b.dataset.act;
+      if(act==='clr'){ pickColorModal(settingsKey,cur[i],()=>redraw()); return; }
       if(act==='up'&&i>0){ const t=cur[i-1]; cur[i-1]=cur[i]; cur[i]=t; }
       else if(act==='dn'&&i<cur.length-1){ const t=cur[i+1]; cur[i+1]=cur[i]; cur[i]=t; }
       else if(act==='del'){ cur.splice(i,1); }
@@ -1711,6 +1748,35 @@ function addOptionModal(title,settingsKey,onAdd){
     });
   }
   bindRows();
+}
+function pickColorModal(settingsKey,val,onDone){
+  const cur=customColor(settingsKey,val); // 現在の指定（null=初期設定）
+  const bg=el(`<div class="modal-bg show" style="z-index:80"><div class="modal" style="max-width:360px"></div></div>`);
+  const m=$('.modal',bg);
+  const co=(k,label,extra)=>`<button class="co ${(k===cur||(k===''&&!cur))?'on':''}" data-k="${k}"><span class="sw ${extra||''}" ${k?`style="background:var(--${k}-bg);border-color:var(--${k})"`:''}>${(k===cur||(k===''&&!cur))?'✓':''}</span>${label}</button>`;
+  m.innerHTML=`
+    <div class="modal-grab"></div>
+    <div class="modal-h"><div class="mt">色を選ぶ</div><button class="modal-x" id="pc-close">閉じる</button></div>
+    <div class="modal-body">
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-bottom:4px">「${esc(val)}」の色</div>
+      <div class="clr-picker">
+        ${co('','初期設定','auto chk')}
+        ${COLOR_CHOICES.map(c=>co(c.k,c.label)).join('')}
+      </div>
+      <div class="hint">「初期設定」を選ぶと、アプリの自動ルールに従います。</div>
+    </div>`;
+  document.body.appendChild(bg);
+  const close=()=>bg.remove();
+  $('#pc-close',m).onclick=close;
+  bg.addEventListener('click',e=>{ if(e.target===bg) close(); });
+  $$('.clr-picker .co',m).forEach(b=> b.onclick=()=>{
+    const k=b.dataset.k;
+    state.settings.optionColors[settingsKey]=state.settings.optionColors[settingsKey]||{};
+    if(k) state.settings.optionColors[settingsKey][val]=k;
+    else delete state.settings.optionColors[settingsKey][val];
+    persist(); close(); if(onDone)onDone();
+    refreshAfterChange();
+  });
 }
 function DEFAULT_LOCK(key,val){
   const locks={ statusOptions:DEFAULT_STATUS, resultOptions:DEFAULT_RESULT, industries:DEFAULT_IND, genres:DEFAULT_GENRE };
