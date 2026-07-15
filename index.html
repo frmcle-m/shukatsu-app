@@ -1711,7 +1711,18 @@ function addOptionModal(title,settingsKey,onAdd){
   const ARU='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>';
   const ARD='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
   const hasColor=['statusOptions','resultOptions','industries','genres'].includes(settingsKey);
-  const swHTML=(o)=>{ const cc=customColor(settingsKey,o); return cc? `<span class="sw" style="background:var(--${cc}-bg);border-color:var(--${cc})"></span>` : `<span class="sw auto"></span>`; };
+  const swDot=(k)=>`<span class="sw" style="background:var(--${k}-bg);border-color:var(--${k})"></span>`;
+  const swHTML=(o)=>{
+    const cc=customColor(settingsKey,o);
+    if(cc) return swDot(cc);                                  // ユーザーが指定した色
+    if(DEFAULT_LOCK(settingsKey,o)){                          // 初期設定のプリセット項目 → 既定色を表示
+      if(settingsKey==='statusOptions') return swDot(statusClass(o));
+      if(settingsKey==='resultOptions') return swDot(resultClass(o));
+      if(settingsKey==='industries') return `<span class="sw" style="background:var(--surface-2);border-color:var(--line)"></span>`;
+      if(settingsKey==='genres') return `<span class="sw" style="background:var(--navy);border-color:var(--navy)"></span>`;
+    }
+    return `<span class="sw auto"></span>`;                   // 新規追加の項目（色未指定）→ レインボー
+  };
   const rowsHTML=()=> cur.map((o,i)=>`<div class="o">
       ${hasColor?`<button class="clr" data-act="clr" data-i="${i}" aria-label="色を選ぶ">${swHTML(o)}</button>`:''}
       <span class="nm">${esc(o)}</span>
